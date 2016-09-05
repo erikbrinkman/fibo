@@ -1,6 +1,12 @@
+# Arduino #
+###########
 *.gcode
 *.stl
 *.skb
 *.bak
 *.nc
 *.dxf
+
+# Vim #
+#######
+.*.un~
