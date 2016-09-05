@@ -10,33 +10,33 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with this program; if not, write to the Free Software
-// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+// Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+// USA.
 //
 // You will find the latest version of this code at the following address:
 // https://github.com/pchretien/fibo
 //
-// This project contains code and libraries provided by Adafruit Industries and can be found on their Github account at:
+// This project contains code and libraries provided by Adafruit Industries and
+// can be found on their Github account at:
 // https://github.com/adafruit
 //
 // Credits:
-// See the credit.txt file for the list of all the backers of the Kickstarter campaign.
+// See the credit.txt file for the list of all the backers of the Kickstarter
+// campaign.
 // https://www.kickstarter.com/projects/basbrun/fibonacci-clock-an-open-source-clock-for-nerds-wit/description
-//
 
+#include <Adafruit_NeoPixel.h>
 #include <Wire.h>
 #include "RTClib.h"
-#include <Adafruit_NeoPixel.h>
 
 #define STRIP_PIN 8
 #define HOUR_PIN 3
 #define MINUTE_PIN 4
 #define BTN_PIN 5
 #define SET_PIN 6
+
 #define DEBOUNCE_DELAY 10
 #define MAX_BUTTONS_INPUT 20
-#define MAX_MODES 3
-#define MAX_PALETTES 10
-#define TOTAL_PALETTES 10
 #define CLOCK_PIXELS 5
 
 // Parameter 1 = number of pixels in strip
@@ -48,729 +48,333 @@
 //   NEO_RGB     Pixels are wired for RGB bitstream (v1 FLORA pixels, not v2)
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(9, STRIP_PIN, NEO_RGB + NEO_KHZ800);
 
-byte bits[CLOCK_PIXELS];
-
-uint32_t black = strip.Color(0,0,0);
-uint32_t colors[TOTAL_PALETTES][4] = 
-  {
-    {
-      // #1 RGB
-      strip.Color(255,255,255),    // off
-      strip.Color(255,10,10),  // hours
-      strip.Color(10,255,10),  // minutes
-      strip.Color(10,10,255) // both;
-    }, 
-    {
-      // #2 Mondrian
-      strip.Color(255,255,255),    // off
-      strip.Color(255,10,10),  // hours
-      strip.Color(248,222,0),  // minutes
-      strip.Color(10,10,255) // both;
-    }, 
-    {
-      // #3 Basbrun
-      strip.Color(255,255,255),    // off
-      strip.Color(80,40,0),  // hours
-      strip.Color(20,200,20),  // minutes
-      strip.Color(255,100,10) // both;
-    },
-    {
-      // #4 80's
-      strip.Color(255,255,255),    // off
-      strip.Color(245,100,201),  // hours
-      strip.Color(114,247,54),  // minutes
-      strip.Color(113,235,219) // both;
-    }
-    ,
-    {
-      // #5 Pastel
-      strip.Color(255,255,255),    // off
-      strip.Color(255,123,123),  // hours
-      strip.Color(143,255,112),  // minutes
-      strip.Color(120,120,255) // both;
-    }
-    ,
-    {
-      // #6 Modern
-      strip.Color(255,255,255),    // off
-      strip.Color(212,49,45),  // hours
-      strip.Color(145,210,49),  // minutes
-      strip.Color(141,95,224) // both;
-    }
-    ,
-    {
-      // #7 Cold
-      strip.Color(255,255,255),    // off
-      strip.Color(209,62,200),  // hours
-      strip.Color(69,232,224),  // minutes
-      strip.Color(80,70,202) // both;
-    }
-    ,
-    {
-      // #8 Warm
-      strip.Color(255,255,255),    // off
-      strip.Color(237,20,20),  // hours
-      strip.Color(246,243,54),  // minutes
-      strip.Color(255,126,21) // both;
-    }
-    ,
-    {
-      //#9 Earth
-      strip.Color(255,255,255),    // off
-      strip.Color(70,35,0),  // hours
-      strip.Color(70,122,10),  // minutes
-      strip.Color(200,182,0) // both;
-    }
-    ,
-    {
-      // #10 Dark
-      strip.Color(255,255,255),    // off
-      strip.Color(211,34,34),  // hours
-      strip.Color(80,151,78),  // minutes
-      strip.Color(16,24,149) // both;
-    }
-  }; 
-  
-RTC_DS1307 rtc;
-
-boolean on = true;
-
-byte oldHours = 0;
-byte oldMinutes = 0;
-
-int lastButtonValue[MAX_BUTTONS_INPUT];
-int currentButtonValue[MAX_BUTTONS_INPUT];
-
-int mode = 0;
+// These are the color pallets for the standard clock. Adding removing or
+// changing these will work out of the box.
 int palette = 0;
+uint32_t colors[][4] = {{
+                            // #1 RGB
+                            strip.Color(255, 255, 255),  // off
+                            strip.Color(255, 10, 10),    // hours
+                            strip.Color(10, 255, 10),    // minutes
+                            strip.Color(10, 10, 255)     // both;
+                        },
+                        {
+                            // #2 Mondrian
+                            strip.Color(255, 255, 255),  
+                            strip.Color(255, 10, 10),
+                            strip.Color(248, 222, 0),    
+                            strip.Color(10, 10, 255)     
+                        },
+                        {
+                            // #3 Basbrun
+                            strip.Color(255, 255, 255),  
+                            strip.Color(80, 40, 0),      
+                            strip.Color(20, 200, 20),    
+                            strip.Color(255, 100, 10)    
+                        },
+                        {
+                            // #4 80's
+                            strip.Color(255, 255, 255),  
+                            strip.Color(245, 100, 201),  
+                            strip.Color(114, 247, 54),   
+                            strip.Color(113, 235, 219)   
+                        },
+                        {
+                            // #5 Pastel
+                            strip.Color(255, 255, 255),  
+                            strip.Color(255, 123, 123),  
+                            strip.Color(143, 255, 112),  
+                            strip.Color(120, 120, 255)   
+                        },
+                        {
+                            // #6 Modern
+                            strip.Color(255, 255, 255),  
+                            strip.Color(212, 49, 45),    
+                            strip.Color(145, 210, 49),   
+                            strip.Color(141, 95, 224)    
+                        },
+                        {
+                            // #7 Cold
+                            strip.Color(255, 255, 255),  
+                            strip.Color(209, 62, 200),   
+                            strip.Color(69, 232, 224),   
+                            strip.Color(80, 70, 202)     
+                        },
+                        {
+                            // #8 Warm
+                            strip.Color(255, 255, 255),  
+                            strip.Color(237, 20, 20),    
+                            strip.Color(246, 243, 54),   
+                            strip.Color(255, 126, 21)    
+                        },
+                        {
+                            // #9 Earth
+                            strip.Color(255, 255, 255),  
+                            strip.Color(70, 35, 0),      
+                            strip.Color(70, 122, 10),    
+                            strip.Color(200, 182, 0)     
+                        },
+                        {
+                            // #10 Dark
+                            strip.Color(255, 255, 255),  
+                            strip.Color(211, 34, 34),    
+                            strip.Color(80, 151, 78),    
+                            strip.Color(16, 24, 149)    
+                        }};
 
-byte error = 0;
-byte oldError = 0;
+// These are the different modes. A mode is just a function that takes a
+// boolean for whether or not it's a first call, and then optionally modifies
+// the pixels of the clock.
+void display_current_time(boolean);
+void rainbow_cycle(boolean);
+void rainbow(boolean);
+void (*modes[])(boolean) = {display_current_time, rainbow_cycle, rainbow};
 
-void setup() 
-{
+// ------------------------
+// Code for displaying time
+// ------------------------
+RTC_DS1307 rtc;
+byte old_hours = 0;
+byte old_minutes = 0;
+byte bits[CLOCK_PIXELS];
+byte fibs[CLOCK_PIXELS] = {1, 1};
+byte cum_fibs[CLOCK_PIXELS] = {0, 1, 2};
+byte total = 2;
+
+void display_current_time(boolean changed) {
+  DateTime now = rtc.now();
+  byte hours = now.hour() % 12;
+  byte minutes = now.minute() / 5;
+
+  if (!changed && old_hours == hours && old_minutes == minutes) {
+    return;
+  }
+
+  old_hours = hours;
+  old_minutes = minutes;
+
+  for (int i = 0; i < CLOCK_PIXELS; i++) {
+    bits[i] = 0;
+  }
+
+  set_bits(hours, 1);
+  set_bits(minutes, 2);
+
+  for (int i = 0; i < CLOCK_PIXELS; i++) {
+    set_pixel(i, colors[palette][bits[i]]);
+  }
+  strip.show();
+}
+
+// TODO This doesn't uniformly select over possible configurations, but it is
+// /much/ simpler than the old code for assigning bits
+void set_bits(byte value, byte offset) {
+  for (int i = CLOCK_PIXELS - 1; i >= 0; --i) {
+    if (value > cum_fibs[i] || (value >= fibs[i] && random(2))) {
+      bits[i] |= offset;
+      value -= fibs[i];
+    }
+  }
+}
+
+// ----------------
+// Code or Rainbows
+// ----------------
+uint16_t j;
+
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t wheel(byte wheel_pos) {
+  if (wheel_pos < 85) {
+    return strip.Color(wheel_pos * 3, 255 - wheel_pos * 3, 0);
+  } else if (wheel_pos < 170) {
+    wheel_pos -= 85;
+    return strip.Color(255 - wheel_pos * 3, 0, wheel_pos * 3);
+  } else {
+    wheel_pos -= 170;
+    return strip.Color(0, wheel_pos * 3, 255 - wheel_pos * 3);
+  }
+}
+
+void rainbow(boolean changed) {
+  uint16_t i;
+  if (changed) {
+      j = 0;
+  }
+  j %= 256;
+
+  for (i = 0; i < CLOCK_PIXELS; i++) {
+      set_pixel(i, wheel((i + j) % 256));
+  }
+
+  strip.show();
+  delay(20);
+  j += 1;
+}
+
+// Slightly different, this makes the rainbow equally distributed throughout
+void rainbow_cycle(boolean changed) {
+  uint16_t i;
+  if (changed) {
+      j = 0;
+  }
+  j %= 256;
+
+  // 5 cycles of all colors on wheel
+  for (i = 0; i < CLOCK_PIXELS; i++) {
+      set_pixel(i, wheel(((i * 256 / CLOCK_PIXELS) + j) % 256));
+  }
+  strip.show();
+  delay(20);
+  j += 1;
+}
+
+// -----------------------
+// Code for main operation
+// -----------------------
+byte pixel_inds[CLOCK_PIXELS + 1] = {0, 1, 2, 3, 5, 10};
+
+int last_button_value[MAX_BUTTONS_INPUT];
+int current_button_value[MAX_BUTTONS_INPUT];
+boolean on = true;
+int mode = 0;
+
+void setup() {
   Serial.begin(9600);
-  
+
   // Initialize the strip and set all pixels to 'off'
   strip.begin();
-  strip.show(); 
-    
+  strip.show();
+
   Wire.begin();
   rtc.begin();
 
-  if (! rtc.isrunning()) 
-  {
+  if (!rtc.isrunning()) {
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-    // This line sets the RTC with an explicit date & time, for example to set
-    // January 21, 2014 at 3am you would call:
-    // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   }
-  
+
   // Make the random() function return unpredictable results
   randomSeed(rtc.now().unixtime());
-  
+
   pinMode(HOUR_PIN, INPUT);
   pinMode(MINUTE_PIN, INPUT);
   pinMode(BTN_PIN, INPUT);
   pinMode(SET_PIN, INPUT);
-  
+
   pinMode(13, OUTPUT);
-  
-  for(int i=0;i<4;i++)
-  {
+
+  for (int i = 0; i < 4; i++) {
     digitalWrite(13, HIGH);
     delay(250);
     digitalWrite(13, LOW);
     delay(250);
   }
-  
-  // Make sure the time is always displayed the first 
+
+  // Compute important parts of the Fibonacci sequence
+  for (int index = 2; index < CLOCK_PIXELS; ++index) {
+    fibs[index] = fibs[index - 1] + fibs[index - 2];
+    if (index + 1 < CLOCK_PIXELS) {
+      total += fibs[index];
+      cum_fibs[index + 1] = total;
+    }
+  }
+
+  // Make sure the time is always displayed the first
   // time the clock is powered on.
-  oldHours = 99;
+  mode = 0;
+  old_hours = 99;
 }
 
-void loop() 
-{
-  // 9:25
-//  setPixel(0, strip.Color(255,255,255));
-//  setPixel(1, strip.Color(255,10,10));
-//  setPixel(2, strip.Color(10,255,10));
-//  setPixel(3, strip.Color(10,10,255));
-//  setPixel(4, strip.Color(255,10,10));
-//  strip.show();
-//  return;  
-
-  
+void loop() {
   // Read buttons
   int set_button = debounce(SET_PIN);
   int hour_button = debounce(HOUR_PIN);
   int minute_button = debounce(MINUTE_PIN);
   int button = debounce(BTN_PIN);
-  
-  if(set_button && button && hasChanged(BTN_PIN))
-  {    
-    for(int i=0; i<100; i++)
-    {
-      if(!debounce(SET_PIN) || !debounce(BTN_PIN))
-        break;
-    }
-    
-    if(debounce(SET_PIN) && debounce(BTN_PIN))
-    {
-      checkErrors();
-    }
-  }  
-  else if( set_button && hour_button && hasChanged(HOUR_PIN))
-  {
-    DateTime newTime = DateTime(rtc.now().unixtime()+3600);
-    rtc.adjust( newTime );
-    
-    displayCurrentTime();
-  }
-  else if( set_button && minute_button && hasChanged(MINUTE_PIN))
-  {
+  boolean changed = false;
+
+  if (set_button && hour_button && has_changed(HOUR_PIN)) {
+    DateTime newTime = DateTime(rtc.now().unixtime() + 3600);
+    rtc.adjust(newTime);
+    mode = 0;
+    changed = true;
+
+  } else if (set_button && minute_button && has_changed(MINUTE_PIN)) {
     DateTime fixTime = rtc.now();
-    
-    DateTime newTime = DateTime(
-          fixTime.year(), 
-          fixTime.month(), 
-          fixTime.day(), 
-          fixTime.hour(), 
-          ((fixTime.minute()-fixTime.minute()%5)+5)%60, 
-          0);
-          
-    rtc.adjust( newTime );
-          
-    displayCurrentTime();
-  }
-  else if( minute_button && hasChanged(MINUTE_PIN))
-  {
-    toggleOnOff();
-  } 
-  else if( hour_button && hasChanged(HOUR_PIN))
-  {
-    palette = (palette+1)%MAX_PALETTES;
-    oldHours = 99;
-    oldError = 99;
-  }   
-  else if( button && hasChanged(BTN_PIN))
-  {
-    mode = mode + 1;
-    
-    if(mode >= MAX_MODES)
-      mode = 0;
+    // FIXME This could probably be simpler
+    DateTime newTime =
+        DateTime(fixTime.year(), fixTime.month(), fixTime.day(), fixTime.hour(),
+                 ((fixTime.minute() - fixTime.minute() % 5) + 5) % 60, 0);
+    rtc.adjust(newTime);
+    mode = 0;
+    changed = true;
+
+  } else if (minute_button && has_changed(MINUTE_PIN)) {
+    toggle_on_off();
+
+  } else if (hour_button && has_changed(HOUR_PIN)) {
+    palette = (palette + 1) % (sizeof(colors) / sizeof(*colors));
+    if (!mode) {
+      changed = true;
+    }
+
+  } else if (button && has_changed(BTN_PIN)) {
+    mode = (mode + 1) % (sizeof(modes) / sizeof(*modes));
+    changed = true;
   }
 
   // Store buttons new values
-  resetButtonValues();
-  switch(mode)
-  {
-    case 0:  
-      displayCurrentTime();
-      break;
-      
-    case 1:
-      oldHours = 99;
-      rainbowCycle(20);
-      break;
-      
-    case 2:
-      oldHours = 99;
-      rainbow(20);
-      break;
-      
-    case 3:
-      oldHours = 99;
-      // Display error code
-      displayErrorCode();
-      break;
-  }  
+  reset_button_values();
+  modes[mode](changed);
 }
 
-int debounce(int pin)
-{
+int debounce(int pin) {
   int val = digitalRead(pin);
-  if( val == lastButtonValue[pin] )
-  {
-    currentButtonValue[pin] = val;
+  if (val == last_button_value[pin]) {
+    current_button_value[pin] = val;
     return val;
   }
-    
+
   delay(DEBOUNCE_DELAY);
-  
+
   val = digitalRead(pin);
-  if( val != lastButtonValue[pin] )
-  {
-    currentButtonValue[pin] = val;
+  if (val != last_button_value[pin]) {
+    current_button_value[pin] = val;
     return val;
   }
-  
-  currentButtonValue[pin] = lastButtonValue[pin];
-  return lastButtonValue[pin];
+
+  current_button_value[pin] = last_button_value[pin];
+  return last_button_value[pin];
 }
 
-boolean hasChanged(int pin)
-{
-  return lastButtonValue[pin] != currentButtonValue[pin];
+boolean has_changed(int pin) {
+  return last_button_value[pin] != current_button_value[pin];
 }
 
-void resetButtonValues()
-{
-  for(int i=0; i<MAX_BUTTONS_INPUT; i++)
-    lastButtonValue[i] = currentButtonValue[i];
-}
-
-void displayCurrentTime()
-{
-  DateTime now = rtc.now();  
-  setTime(now.hour()%12, now.minute()); 
-}
-
-void setTime(byte hours, byte minutes)
-{
-  if(oldHours == hours && oldMinutes/5 == minutes/5)
-    return;
-    
-  oldHours = hours;
-  oldMinutes = minutes;
-  
-  for(int i=0; i<CLOCK_PIXELS; i++)
-    bits[i] = 0;
-    
-  setBits(hours, 0x01);
-  setBits(minutes/5, 0x02);
-
-  for(int i=0; i<CLOCK_PIXELS; i++)
-  {   
-    setPixel(i, colors[palette][bits[i]]);
-    strip.show();
+void reset_button_values() {
+  for (int i = 0; i < MAX_BUTTONS_INPUT; i++) {
+    last_button_value[i] = current_button_value[i];
   }
 }
 
-void displayErrorCode()
-{
-  if(oldError == error)
-    return;
-    
-  oldError = error;
-  
-  for(int i=0; i<CLOCK_PIXELS; i++)
-    bits[i] = 0;
-  
-  if(error == 0)
-  {
-    setBits(12, 0x02);
-  }
-  else
-  {
-    setBits(error, 0x01);
-  }
-
-  for(int i=0; i<CLOCK_PIXELS; i++)
-  {   
-    setPixel(i, colors[palette][bits[i]]);
-  }
-  
-  strip.show();
-}
-
-void setBits(byte value, byte offset)
-{
-  switch(value)
-  {
-    case 1:
-      switch(random(2))
-      {
-        case 0:
-          bits[0]|=offset;
-          break;
-        case 1:
-          bits[1]|=offset;
-          break;
-      }
-      break;
-    case 2:
-      switch(random(2))
-      {
-        case 0:
-          bits[2]|=offset;
-          break;
-        case 1:
-          bits[0]|=offset;
-          bits[1]|=offset;
-          break;
-      }
-      break;
-    case 3:
-      switch(random(3))
-      {
-        case 0:
-          bits[3]|=offset;
-          break;
-        case 1:
-          bits[0]|=offset;
-          bits[2]|=offset;
-          break;
-        case 2:
-          bits[1]|=offset;
-          bits[2]|=offset;
-          break;
-      }
-      break;
-    case 4:
-      switch(random(3))
-      {
-        case 0:
-          bits[0]|=offset;
-          bits[3]|=offset;
-          break;
-        case 1:
-          bits[1]|=offset;
-          bits[3]|=offset;
-          break;
-        case 2:
-          bits[0]|=offset;
-          bits[1]|=offset;
-          bits[2]|=offset;
-          break;
-      }
-      break;
-    case 5:
-      switch(random(3))
-      {
-        case 0:
-          bits[4]|=offset;
-          break;
-        case 1:
-          bits[2]|=offset;
-          bits[3]|=offset;
-          break;
-        case 2:
-          bits[0]|=offset;
-          bits[1]|=offset;
-          bits[3]|=offset;
-          break;
-      }
-      break;
-    case 6:
-      switch(random(4))
-      {
-        case 0:
-          bits[0]|=offset;
-          bits[4]|=offset;
-          break;
-        case 1:
-          bits[1]|=offset;
-          bits[4]|=offset;
-          break;
-        case 2:
-          bits[0]|=offset;
-          bits[2]|=offset;
-          bits[3]|=offset;
-          break;
-        case 3:
-          bits[1]|=offset;
-          bits[2]|=offset;
-          bits[3]|=offset;
-          break;
-      }
-      break;
-    case 7:
-      switch(random(3))
-      {
-        case 0:
-          bits[2]|=offset;
-          bits[4]|=offset;
-          break;
-        case 1:
-          bits[0]|=offset;
-          bits[1]|=offset;
-          bits[4]|=offset;
-          break;
-        case 2:
-          bits[0]|=offset;
-          bits[1]|=offset;
-          bits[2]|=offset;
-          bits[3]|=offset;
-          break;
-      }
-      break;
-    case 8:
-      switch(random(3))
-      {
-        case 0:
-          bits[3]|=offset;
-          bits[4]|=offset;
-          break;
-        case 1:
-          bits[0]|=offset;
-          bits[2]|=offset;
-          bits[4]|=offset;
-          break;
-        case 2:
-          bits[1]|=offset;
-          bits[2]|=offset;
-          bits[4]|=offset;
-          break;
-      }      
-      break;
-    case 9:
-      switch(random(2))
-      {
-        case 0:
-          bits[0]|=offset;
-          bits[3]|=offset;
-          bits[4]|=offset;
-          break;
-        case 1:
-          bits[1]|=offset;
-          bits[3]|=offset;
-          bits[4]|=offset;
-          break;
-      }      
-      break;
-    case 10:
-      switch(random(2))
-      {
-        case 0:
-          bits[2]|=offset;
-          bits[3]|=offset;
-          bits[4]|=offset;
-          break;
-        case 1:
-          bits[0]|=offset;
-          bits[1]|=offset;
-          bits[3]|=offset;
-          bits[4]|=offset;
-          break;
-      }            
-      break;
-    case 11:
-      switch(random(2))
-      {
-        case 0:
-          bits[0]|=offset;
-          bits[2]|=offset;
-          bits[3]|=offset;
-          bits[4]|=offset;      
-          break;
-        case 1:
-          bits[1]|=offset;
-          bits[2]|=offset;
-          bits[3]|=offset;
-          bits[4]|=offset; 
-          break;
-      }          
-
-      break;
-    case 12:
-      bits[0]|=offset;
-      bits[1]|=offset;
-      bits[2]|=offset;
-      bits[3]|=offset;
-      bits[4]|=offset;        
-      
-      break;
-  }
-}
-
-void setPixel(byte pixel, uint32_t color)
-{
-  if(!on)
-    return;
-  
-  switch(pixel)
-  {
-    case 0:
-      strip.setPixelColor(0, color);
-      break;
-    case 1:
-      strip.setPixelColor(1, color);
-      break;
-    case 2:
-      strip.setPixelColor(2, color);
-      break;
-    case 3:
-      strip.setPixelColor(3, color);
-      strip.setPixelColor(4, color);
-      break;
-    case 4:
-      strip.setPixelColor(5, color);
-      strip.setPixelColor(6, color);
-      strip.setPixelColor(7, color);
-      strip.setPixelColor(8, color);
-      strip.setPixelColor(9, color);
-      break;
-  };
-}
-
-void rainbow(uint8_t wait) 
-{
-  uint16_t i, j;
-
-  for(j=0; j<256; j++) 
-  {
-    for(i=0; i< CLOCK_PIXELS; i++) 
-    {
-      setPixel(i, Wheel((i+j) & 255));
+void set_pixel(byte pixel, uint32_t color) {
+  if (on) {
+    for (byte pix = pixel_inds[pixel]; pix < pixel_inds[pixel + 1]; ++pix) {
+      strip.setPixelColor(pix, color);
     }
-    
-    strip.show();
-    delay(wait);
-    
-    if(debounce(BTN_PIN) && hasChanged(BTN_PIN))
-    {
-      mode = (mode + 1)%MAX_MODES;
-      resetButtonValues();
-      return;
-    }
-    
-    if(debounce(MINUTE_PIN) && hasChanged(MINUTE_PIN))
-    {
-      toggleOnOff();
-      resetButtonValues();
-      return;
-    }
-    
-    resetButtonValues();
   }
 }
 
-// Slightly different, this makes the rainbow equally distributed throughout
-void rainbowCycle(uint8_t wait) 
-{
-  uint16_t i, j;
-
-  for(j=0; j<256*5; j++) 
-  { 
-    // 5 cycles of all colors on wheel
-    for(i=0; i< CLOCK_PIXELS; i++) 
-    {
-      setPixel(i, Wheel(((i * 256 / CLOCK_PIXELS) + j) & 255));
+void toggle_on_off() {
+  if (on) {
+    for (int i = 0; i < CLOCK_PIXELS; i++) {
+      set_pixel(i, strip.Color(0, 0, 0));
     }
     strip.show();
-    delay(wait);
-    
-    if(debounce(BTN_PIN) && hasChanged(BTN_PIN))
-    {
-      mode = (mode + 1)%MAX_MODES;
-      resetButtonValues();
-      return;
-    }
-    
-    if(debounce(MINUTE_PIN) && hasChanged(MINUTE_PIN))
-    {
-      toggleOnOff();
-      resetButtonValues();
-      return;
-    }
-    
-    resetButtonValues();
+  } else {
+    mode = 0;
+    old_hours = 99;
   }
-}
 
-// Input a value 0 to 255 to get a color value.
-// The colours are a transition r - g - b - back to r.
-uint32_t Wheel(byte WheelPos) 
-{
-  if(WheelPos < 85) 
-  {
-   return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
-  } 
-  else if(WheelPos < 170) 
-  {
-   WheelPos -= 85;
-   return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
-  } 
-  else 
-  {
-   WheelPos -= 170;
-   return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
-  }
-}
-
-void toggleOnOff()
-{
-  if( on )
-  {
-    for( int i=0; i<CLOCK_PIXELS; i++)
-      setPixel(i, black);
-      
-    strip.show();
-  }
-  
   on = !on;
-  
-  if(on)
-  {
-    oldHours = 99;
-    oldError = 99;
-  }
 }
-
-void checkErrors()
-{
-  error = 0;
-  oldError = 99;
-  mode = 3;
-  palette = 0;
-  
-  // Test sequence
-  if (! rtc.isrunning())
-  {
-    error |= 0x1;
-  }
-  
-  int time1 = rtc.now().unixtime();
-  delay(1200);
-  int time2 = rtc.now().unixtime();
-  if(time1 == time2)
-  {
-    error |= 0x02;
-  }  
-}
-
-void printDateTime(DateTime now)
-{
-  Serial.print(now.year(), DEC);
-  Serial.print('/');
-  Serial.print(now.month(), DEC);
-  Serial.print('/');
-  Serial.print(now.day(), DEC);
-  Serial.print(' ');
-  Serial.print(now.hour(), DEC);
-  Serial.print(':');
-  Serial.print(now.minute(), DEC);
-  Serial.print(':');
-  Serial.print(now.second(), DEC);
-  Serial.println();
-  
-  Serial.print(" since midnight 1/1/1970 = ");
-  Serial.print(now.unixtime());
-  Serial.print("s = ");
-  Serial.print(now.unixtime() / 86400L);
-  Serial.println("d");
-  
-  // calculate a date which is 7 days and 30 seconds into the future
-  DateTime future (now.unixtime() + 7 * 86400L + 30);
-  
-  Serial.print(" now + 7d + 30s: ");
-  Serial.print(future.year(), DEC);
-  Serial.print('/');
-  Serial.print(future.month(), DEC);
-  Serial.print('/');
-  Serial.print(future.day(), DEC);
-  Serial.print(' ');
-  Serial.print(future.hour(), DEC);
-  Serial.print(':');
-  Serial.print(future.minute(), DEC);
-  Serial.print(':');
-  Serial.print(future.second(), DEC);
-  Serial.println();
-  
-  Serial.println();
-  
-  delay(1000);
-}
-
-
