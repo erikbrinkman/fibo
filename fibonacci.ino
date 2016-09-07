@@ -39,6 +39,10 @@
 #define MAX_BUTTONS_INPUT 20
 #define CLOCK_PIXELS 5
 
+#define TIME_CHANGED 1
+#define COLOR_CHANGED 2
+#define MODE_CHANGED 4
+
 // Parameter 1 = number of pixels in strip
 // Parameter 2 = pin number (most are valid)
 // Parameter 3 = pixel type flags, add together as needed:
@@ -125,10 +129,10 @@ uint32_t colors[][4] = {{
 // These are the different modes. A mode is just a function that takes a
 // boolean for whether or not it's a first call, and then optionally modifies
 // the pixels of the clock.
-void display_current_time(boolean);
-void rainbow_cycle(boolean);
-void rainbow(boolean);
-void (*modes[])(boolean) = {display_current_time, rainbow_cycle, rainbow};
+void display_current_time(byte);
+void rainbow_cycle(byte);
+void rainbow(byte);
+void (*modes[])(byte) = {display_current_time, rainbow_cycle, rainbow};
 
 // ------------------------
 // Code for displaying time
@@ -141,7 +145,7 @@ byte fibs[CLOCK_PIXELS] = {1, 1};
 byte cum_fibs[CLOCK_PIXELS] = {0, 1, 2};
 byte total = 2;
 
-void display_current_time(boolean changed) {
+void display_current_time(byte changed) {
   DateTime now = rtc.now();
   byte hours = now.hour() % 12;
   byte minutes = now.minute() / 5;
@@ -196,9 +200,9 @@ uint32_t wheel(byte wheel_pos) {
   }
 }
 
-void rainbow(boolean changed) {
+void rainbow(byte changed) {
   uint16_t i;
-  if (changed) {
+  if (changed & MODE_CHANGED) {
       j = 0;
   }
   j %= 256;
@@ -213,9 +217,9 @@ void rainbow(boolean changed) {
 }
 
 // Slightly different, this makes the rainbow equally distributed throughout
-void rainbow_cycle(boolean changed) {
+void rainbow_cycle(byte changed) {
   uint16_t i;
-  if (changed) {
+  if (changed & MODE_CHANGED) {
       j = 0;
   }
   j %= 256;
@@ -291,13 +295,13 @@ void loop() {
   int hour_button = debounce(HOUR_PIN);
   int minute_button = debounce(MINUTE_PIN);
   int button = debounce(BTN_PIN);
-  boolean changed = false;
+  byte changed = 0;
 
   if (set_button && hour_button && has_changed(HOUR_PIN)) {
     DateTime newTime = DateTime(rtc.now().unixtime() + 3600);
     rtc.adjust(newTime);
     mode = 0;
-    changed = true;
+    changed = TIME_CHANGED;
 
   } else if (set_button && minute_button && has_changed(MINUTE_PIN)) {
     DateTime fixTime = rtc.now();
@@ -307,20 +311,18 @@ void loop() {
                  ((fixTime.minute() - fixTime.minute() % 5) + 5) % 60, 0);
     rtc.adjust(newTime);
     mode = 0;
-    changed = true;
+    changed = TIME_CHANGED;
 
   } else if (minute_button && has_changed(MINUTE_PIN)) {
     toggle_on_off();
 
   } else if (hour_button && has_changed(HOUR_PIN)) {
     palette = (palette + 1) % (sizeof(colors) / sizeof(*colors));
-    if (!mode) {
-      changed = true;
-    }
+    changed = COLOR_CHANGED;
 
   } else if (button && has_changed(BTN_PIN)) {
     mode = (mode + 1) % (sizeof(modes) / sizeof(*modes));
-    changed = true;
+    changed = MODE_CHANGED;
   }
 
   // Store buttons new values
