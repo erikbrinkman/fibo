@@ -64,66 +64,66 @@ uint32_t colors[][4] = {{
                         },
                         {
                             // #2 Mondrian
-                            strip.Color(255, 255, 255),  
-                            strip.Color(255, 10, 10),
-                            strip.Color(248, 222, 0),    
-                            strip.Color(10, 10, 255)     
+                            strip.Color(255, 255, 255),  //
+                            strip.Color(255, 10, 10),    //
+                            strip.Color(248, 222, 0),    //
+                            strip.Color(10, 10, 255)     //
                         },
                         {
                             // #3 Basbrun
-                            strip.Color(255, 255, 255),  
-                            strip.Color(80, 40, 0),      
-                            strip.Color(20, 200, 20),    
-                            strip.Color(255, 100, 10)    
+                            strip.Color(255, 255, 255),  //
+                            strip.Color(80, 40, 0),      //
+                            strip.Color(20, 200, 20),    //
+                            strip.Color(255, 100, 10)    //
                         },
                         {
                             // #4 80's
-                            strip.Color(255, 255, 255),  
-                            strip.Color(245, 100, 201),  
-                            strip.Color(114, 247, 54),   
-                            strip.Color(113, 235, 219)   
+                            strip.Color(255, 255, 255),  //
+                            strip.Color(245, 100, 201),  //
+                            strip.Color(114, 247, 54),   //
+                            strip.Color(113, 235, 219)   //
                         },
                         {
                             // #5 Pastel
-                            strip.Color(255, 255, 255),  
-                            strip.Color(255, 123, 123),  
-                            strip.Color(143, 255, 112),  
-                            strip.Color(120, 120, 255)   
+                            strip.Color(255, 255, 255),  //
+                            strip.Color(255, 123, 123),  //
+                            strip.Color(143, 255, 112),  //
+                            strip.Color(120, 120, 255)   //
                         },
                         {
                             // #6 Modern
-                            strip.Color(255, 255, 255),  
-                            strip.Color(212, 49, 45),    
-                            strip.Color(145, 210, 49),   
-                            strip.Color(141, 95, 224)    
+                            strip.Color(255, 255, 255),  //
+                            strip.Color(212, 49, 45),    //
+                            strip.Color(145, 210, 49),   //
+                            strip.Color(141, 95, 224)    //
                         },
                         {
                             // #7 Cold
-                            strip.Color(255, 255, 255),  
-                            strip.Color(209, 62, 200),   
-                            strip.Color(69, 232, 224),   
-                            strip.Color(80, 70, 202)     
+                            strip.Color(255, 255, 255),  //
+                            strip.Color(209, 62, 200),   //
+                            strip.Color(69, 232, 224),   //
+                            strip.Color(80, 70, 202)     //
                         },
                         {
                             // #8 Warm
-                            strip.Color(255, 255, 255),  
-                            strip.Color(237, 20, 20),    
-                            strip.Color(246, 243, 54),   
-                            strip.Color(255, 126, 21)    
+                            strip.Color(255, 255, 255),  //
+                            strip.Color(237, 20, 20),    //
+                            strip.Color(246, 243, 54),   //
+                            strip.Color(255, 126, 21)    //
                         },
                         {
                             // #9 Earth
-                            strip.Color(255, 255, 255),  
-                            strip.Color(70, 35, 0),      
-                            strip.Color(70, 122, 10),    
-                            strip.Color(200, 182, 0)     
+                            strip.Color(255, 255, 255),  //
+                            strip.Color(70, 35, 0),      //
+                            strip.Color(70, 122, 10),    //
+                            strip.Color(200, 182, 0)     //
                         },
                         {
                             // #10 Dark
-                            strip.Color(255, 255, 255),  
-                            strip.Color(211, 34, 34),    
-                            strip.Color(80, 151, 78),    
-                            strip.Color(16, 24, 149)    
+                            strip.Color(255, 255, 255),  //
+                            strip.Color(211, 34, 34),    //
+                            strip.Color(80, 151, 78),    //
+                            strip.Color(16, 24, 149)     //
                         }};
 
 // These are the different modes. A mode is just a function that takes a
@@ -132,7 +132,15 @@ uint32_t colors[][4] = {{
 void display_current_time(byte);
 void rainbow_cycle(byte);
 void rainbow(byte);
-void (*modes[])(byte) = {display_current_time, rainbow_cycle, rainbow};
+void rainbow_palette(byte);
+void rainbow_palette_cycle(byte);
+void (*modes[])(byte) = {
+    display_current_time,   // The standard Fibonacci clock
+    rainbow_cycle,          // Builtin cycle through rainbow
+    rainbow,                // Builtin cycle through rainbow as one pixel
+    rainbow_palette_cycle,  // Variant on the builtin
+    rainbow_palette         // These use the current color instead
+};
 
 // ------------------------
 // Code for displaying time
@@ -184,33 +192,38 @@ void set_bits(byte value, byte offset) {
 // -----------------
 // Code for Rainbows
 // -----------------
-uint16_t j;
+byte j;
 
-// Input a value 0 to 255 to get a color value.
-// The colours are a transition r - g - b - back to r.
-uint32_t wheel(byte wheel_pos) {
-  if (wheel_pos < 85) {
-    return strip.Color(wheel_pos * 3, 255 - wheel_pos * 3, 0);
-  } else if (wheel_pos < 170) {
-    wheel_pos -= 85;
-    return strip.Color(255 - wheel_pos * 3, 0, wheel_pos * 3);
-  } else {
-    wheel_pos -= 170;
-    return strip.Color(0, wheel_pos * 3, 255 - wheel_pos * 3);
-  }
+uint16_t red(uint32_t color) { return color >> 16 & 255; }
+uint16_t green(uint32_t color) { return color >> 8 & 255; }
+uint16_t blue(uint32_t color) { return color & 255; }
+
+// Input a color map, it's length, and a position in [0, 256)
+uint32_t map_wheel(uint32_t* palette, byte palette_length, byte wheel_pos) {
+  byte inc = 256 / palette_length;
+  byte ind = wheel_pos / inc;
+  byte prog = wheel_pos % inc;
+  uint32_t start = palette[ind % palette_length];
+  uint32_t finish = palette[(ind + 1) % palette_length];
+  return strip.Color(
+      (red(start) * (inc - prog) + red(finish) * prog + inc / 2) / inc,
+      (green(start) * (inc - prog) + green(finish) * prog + inc / 2) / inc,
+      (blue(start) * (inc - prog) + blue(finish) * prog + inc / 2) / inc);
+}
+
+uint32_t rainbow_colors[3] = {strip.Color(0, 255, 0), strip.Color(255, 0, 0),
+                              strip.Color(0, 0, 255)};
+inline uint32_t wheel(byte wheel_pos) {
+  return map_wheel(rainbow_colors, 3, wheel_pos);
 }
 
 void rainbow(byte changed) {
-  uint16_t i;
   if (changed & MODE_CHANGED) {
-      j = 0;
+    j = 0;
   }
-  j %= 256;
-
-  for (i = 0; i < CLOCK_PIXELS; i++) {
-      set_pixel(i, wheel((i + j) % 256));
+  for (byte i = 0; i < CLOCK_PIXELS; i++) {
+    set_pixel(i, wheel(j));
   }
-
   strip.show();
   delay(20);
   j += 1;
@@ -218,19 +231,39 @@ void rainbow(byte changed) {
 
 // Slightly different, this makes the rainbow equally distributed throughout
 void rainbow_cycle(byte changed) {
-  uint16_t i;
   if (changed & MODE_CHANGED) {
-      j = 0;
+    j = 0;
   }
-  j %= 256;
-
-  // 5 cycles of all colors on wheel
-  for (i = 0; i < CLOCK_PIXELS; i++) {
-      set_pixel(i, wheel(((i * 256 / CLOCK_PIXELS) + j) % 256));
+  for (byte i = 0; i < CLOCK_PIXELS; i++) {
+    set_pixel(i, wheel(j + i * (256 / CLOCK_PIXELS)));
   }
   strip.show();
   delay(20);
   j += 1;
+}
+
+void rainbow_palette(byte changed) {
+  if (changed & MODE_CHANGED) {
+    j = 0;
+  }
+  for (byte i = 0; i < CLOCK_PIXELS; i++) {
+    set_pixel(i, map_wheel(colors[palette], 4, j));
+  }
+  strip.show();
+  delay(20);
+  j = j + 1;
+}
+
+void rainbow_palette_cycle(byte changed) {
+  if (changed & MODE_CHANGED) {
+    j = 0;
+  }
+  for (byte i = 0; i < CLOCK_PIXELS; i++) {
+    set_pixel(i, map_wheel(colors[palette], 4, j + i * (256 / CLOCK_PIXELS)));
+  }
+  strip.show();
+  delay(20);
+  j = j + 1;
 }
 
 // -----------------------
