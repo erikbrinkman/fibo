@@ -181,9 +181,9 @@ void set_bits(byte value, byte offset) {
   }
 }
 
-// ----------------
-// Code or Rainbows
-// ----------------
+// -----------------
+// Code for Rainbows
+// -----------------
 uint16_t j;
 
 // Input a value 0 to 255 to get a color value.
