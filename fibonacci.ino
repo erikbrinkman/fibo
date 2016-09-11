@@ -134,12 +134,14 @@ void rainbow_cycle(byte);
 void rainbow(byte);
 void rainbow_palette(byte);
 void rainbow_palette_cycle(byte);
+void spiral(byte);
 void (*modes[])(byte) = {
     display_current_time,   // The standard Fibonacci clock
     rainbow_cycle,          // Builtin cycle through rainbow
     rainbow,                // Builtin cycle through rainbow as one pixel
     rainbow_palette_cycle,  // Variant on the builtin
-    rainbow_palette         // These use the current color instead
+    rainbow_palette,        // These use the current color instead
+    spiral                  // Spiral through all of the color palettes
 };
 
 // ------------------------
@@ -264,6 +266,31 @@ void rainbow_palette_cycle(byte changed) {
   strip.show();
   delay(20);
   j = j + 1;
+}
+
+byte spiral_mod =
+    256 / (CLOCK_PIXELS * CLOCK_PIXELS) * (CLOCK_PIXELS * CLOCK_PIXELS) + 1;
+void spiral(byte changed) {
+  if (changed & MODE_CHANGED) {
+    j = 0;
+  }
+  byte offset = j / (CLOCK_PIXELS * CLOCK_PIXELS) * CLOCK_PIXELS;
+  byte pix = j % (CLOCK_PIXELS * CLOCK_PIXELS) / CLOCK_PIXELS;
+  for (byte i = 0; i < CLOCK_PIXELS; i++) {
+    byte val = offset;
+    if (i == pix) {
+      val += j % CLOCK_PIXELS;
+    } else if (i < pix) {
+      val += CLOCK_PIXELS;
+    }
+    set_pixel(i, map_wheel(colors[palette], 4, val * CLOCK_PIXELS));
+  }
+  strip.show();
+  delay(40);
+  j = j + 1;
+  if (spiral_mod > 1) {
+    j %= spiral_mod;
+  }
 }
 
 // -----------------------
